@@ -153,22 +153,32 @@ Resources:
       Handler: index.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Runtime: python3.8
+      Timeout: 30 # Set an appropriate timeout value for the Lambda function
       Code:
         ZipFile: |
           import cfnresponse
           import boto3
+          
           def handler(event, context):
               s3 = boto3.client('s3')
               try:
                   if event['RequestType'] == 'Create':
+                      # Get the redirection URL from the event['ResourceProperties']
+                      redirection_url = event['ResourceProperties']['WWWDomainName']
+                      # Create the redirect HTML content
+                      html_content = f'<html><head><meta http-equiv="refresh" content="0; url=https://{redirection_url}"></head></html>'
+                      
+                      # Put the redirect HTML into the S3 bucket
                       s3.put_object(
                           Bucket=event['ResourceProperties']['Bucket'],
                           Key='index.html',
                           ContentType='text/html',
-                          Body='<html><head><meta http-equiv="refresh" content="0; url=https://www.123cloud.st"></head></html>'
+                          Body=html_content
                       )
+                  # Always send a response to CloudFormation
                   cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
               except Exception as e:
+                  print(e)
                   cfnresponse.send(event, context, cfnresponse.FAILED, {})
 
   S3FileUploadCustomResource:
@@ -176,6 +186,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt S3FileUploaderLambda.Arn
       Bucket: !Ref RedirectBucket
+      WWWDomainName: !Ref WWWDomainName
 
 Outputs:
   CloudFrontDistributionDomainName:
