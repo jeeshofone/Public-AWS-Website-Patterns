@@ -8,10 +8,6 @@ This stack sets up all necessary resources to perform a 301 redirect from your r
 
 This is very useful for those using Substack to host their blog and want to redirect their root domain to their Substack blog. Substack does not support root domains, so this is a workaround to redirect users to your blog hosted on a subdomain.
 
-## Architecture
-
-
-
 ## Key Components
 
 - **Amazon S3 Bucket**: Used to host a static redirect page.
