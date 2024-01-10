@@ -1,0 +1,186 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Redirect a bare root domain to 'www' subdomain using CloudFront, Route 53, and an ACM Certificate
+
+Parameters:
+  RootDomainName:
+    Type: String
+    Default: "123cloud.st"
+    Description: The root domain name (e.g., 123cloud.st)
+  WWWDomainName:
+    Type: String
+    Description: The domain endpoint where you want users directed (e.g., www.123cloud.st)
+  HostedZoneID:
+    Type: String
+    Default: "abc123"
+    Description: The ID of the hosted zone in Route 53
+
+
+Resources:
+  RedirectBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${RootDomainName}-redirect-bucket
+      PublicAccessBlockConfiguration: 
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration: 
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: ['GET']
+            AllowedOrigins:
+              - !Sub https://${RootDomainName}
+            ExposedHeaders: ['Date']
+            MaxAge: 3600
+
+  RedirectBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref RedirectBucket
+      PolicyDocument:
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource: !Sub ${RedirectBucket.Arn}/*
+          Principal:
+            Service: cloudfront.amazonaws.com
+          Condition:
+            StringEquals:
+              AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistributionForRedirect}
+  
+  CloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties: 
+      OriginAccessControlConfig:
+        Description: Default Origin Access Control
+        Name: !Ref AWS::StackName
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  CloudFrontDistributionForRedirect:
+    Type: 'AWS::CloudFront::Distribution'
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - !Ref RootDomainName
+        DefaultRootObject: index.html
+        Comment: !Sub CloudFront distribution for ${AWS::StackName} redirect ${RootDomainName} to ${WWWDomainName}
+        Enabled: true
+        HttpVersion: 'http2'
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt RedirectBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+            OriginAccessControlId: !GetAtt CloudFrontOriginAccessControl.Id
+        DefaultCacheBehavior:
+          TargetOriginId: 'S3Origin'
+          ViewerProtocolPolicy: 'redirect-to-https'
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: 'none'
+          Compress: true
+        ViewerCertificate:
+          AcmCertificateArn: !Ref RedirectAcmCertificate
+          SslSupportMethod: 'sni-only'
+          MinimumProtocolVersion: 'TLSv1.2_2021'
+        CustomErrorResponses:
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+
+  RedirectAcmCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref RootDomainName
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref RootDomainName
+          HostedZoneId: !Ref HostedZoneID
+
+  Route53RecordSetGroup:
+    Type: AWS::Route53::RecordSetGroup
+    DependsOn: CloudFrontDistributionForRedirect
+    Properties:
+      HostedZoneId: !Ref HostedZoneID
+      RecordSets:
+        - Name: !Ref RootDomainName
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt CloudFrontDistributionForRedirect.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2 # CloudFront Zone ID
+        - Name: !Ref RootDomainName
+          Type: AAAA
+          AliasTarget:
+            DNSName: !GetAtt CloudFrontDistributionForRedirect.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2 # CloudFront Zone ID
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaS3AndLogsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub 'arn:aws:s3:::${RedirectBucket}/*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+
+  S3FileUploaderLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.8
+      Code:
+        ZipFile: |
+          import cfnresponse
+          import boto3
+          def handler(event, context):
+              s3 = boto3.client('s3')
+              try:
+                  if event['RequestType'] == 'Create':
+                      s3.put_object(
+                          Bucket=event['ResourceProperties']['Bucket'],
+                          Key='index.html',
+                          ContentType='text/html',
+                          Body='<html><head><meta http-equiv="refresh" content="0; url=https://www.123cloud.st"></head></html>'
+                      )
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+              except Exception as e:
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {})
+
+  S3FileUploadCustomResource:
+    Type: Custom::S3FileUpload
+    Properties:
+      ServiceToken: !GetAtt S3FileUploaderLambda.Arn
+      Bucket: !Ref RedirectBucket
+
+Outputs:
+  CloudFrontDistributionDomainName:
+    Description: The domain name of the CloudFront distribution
+    Value: !GetAtt CloudFrontDistributionForRedirect.DomainName
+  RedirectAcmCertificateArn:
+    Description: The ARN of the ACM certificate
+    Value: !Ref RedirectAcmCertificate
