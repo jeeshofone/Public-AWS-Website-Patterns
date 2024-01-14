@@ -6,6 +6,10 @@ This AWS CloudFormation stack enables redirection from a specified source domain
 
 This stack creates resources necessary for HTTP to HTTPS redirection using an Amazon S3 bucket to host the redirect logic and an Amazon CloudFront distribution to enforce HTTPS and cache the redirect response globally. Additionally, if you opt to create DNS records or an ACM certificate, this stack will manage those resources within AWS Route 53 and AWS Certificate Manager, respectively.
 
+## Architecture Diagram
+
+![301 https Redirect Architecture](301-subdomain-redirect.png)
+
 ## Template Details
 
 - **Source Domain**: The domain from which traffic will be redirected.
