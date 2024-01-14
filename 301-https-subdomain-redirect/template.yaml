@@ -1,0 +1,174 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: S3 and CloudFront stack to redirect with a 301 from a source domain to a destination domain with optional DNS entries.
+
+Parameters:
+
+  SourceDomain:
+    Type: String
+    Description: The source domain name for the redirect.
+    Default: '123cloud.st'
+
+  DestinationDomain:
+    Type: String
+    Description: The destination domain name for the redirect.
+    Default: 'www.123cloud.st'
+
+  HostedZoneId:
+    Type: String
+    Description: The ID of the hosted zone in Route 53 where the source domain's DNS records reside.
+    Default: ''
+
+  CreateDNSRecords:
+    Type: String
+    Description: Whether to create DNS records in Route 53 for the source domain(yes/no)
+    AllowedValues:
+      - 'yes'
+      - 'no'
+    Default: 'no'
+
+  ACMCertificateArn:
+    Type: String
+    Description: The ARN of an existing ACM certificate to use with CloudFront. If left blank and CreateACMCertificate is 'yes', a new certificate will be created.
+    Default: ''
+
+  CreateACMCertificate:
+    Type: String
+    Description: Whether to create an ACM certificate if one is not provided. If 'yes', certificate will be created for use with CloudFront.
+    AllowedValues:
+      - 'yes'
+      - 'no'
+    Default: 'no'
+
+Conditions:
+
+  CreateDNSRecordsCondition:
+    Fn::Equals:
+      - !Ref CreateDNSRecords
+      - 'yes'
+
+  UseExistingCertificateCondition:
+    Fn::Not:
+      - Fn::Equals:
+          - !Ref ACMCertificateArn
+          - ''
+
+  CreateNewCertificateCondition:
+    Fn::And:
+      - Fn::Equals:
+          - !Ref CreateACMCertificate
+          - 'yes'
+      - Fn::Not:
+          - Condition: UseExistingCertificateCondition
+
+Resources:
+
+  ACMCertificateResource:
+    Type: 'AWS::CertificateManager::Certificate'
+    Condition: CreateNewCertificateCondition
+    Properties:
+      DomainName: !Ref SourceDomain
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref SourceDomain
+          HostedZoneId: !Ref HostedZoneId
+
+  # The S3 bucket configured for website hosting to handle the redirect
+  S3BucketForRedirect:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub '${SourceDomain}-redirect-bucket-${AWS::AccountId}-${AWS::Region}'
+      WebsiteConfiguration:
+        RedirectAllRequestsTo:
+          HostName: !Ref DestinationDomain
+          Protocol: 'https'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        IgnorePublicAcls: false
+        BlockPublicPolicy: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: ['GET']
+            AllowedOrigins: ['*']
+            MaxAge: 3000
+
+  S3BucketPolicyForRedirect:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref S3BucketForRedirect
+      PolicyDocument:
+        Statement:
+          - Sid: 'PublicReadGetObject'
+            Effect: 'Allow'
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Sub 'arn:aws:s3:::${S3BucketForRedirect}/*'
+
+  # The CloudFront distribution that serves content from the S3 bucket website
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - !Ref SourceDomain
+        Comment: !Sub 'CloudFront Distribution for redirection from ${SourceDomain} to ${DestinationDomain}'
+        Enabled: true
+        HttpVersion: 'http2and3'
+        Origins:
+          - DomainName: !Sub '${S3BucketForRedirect}.s3-website-${AWS::Region}.amazonaws.com'
+            Id: 'S3OriginForSourceDomain'
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: 'http-only'  # S3 website does not support HTTPS
+        DefaultCacheBehavior:
+          TargetOriginId: 'S3OriginForSourceDomain'
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+          CachedMethods:
+            - GET
+            - HEAD
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: 'none'
+          MinTTL: 0
+          DefaultTTL: 0
+          MaxTTL: 0
+        ViewerCertificate:
+          AcmCertificateArn: !If [UseExistingCertificateCondition, !Ref ACMCertificateArn, !Ref ACMCertificateResource]
+          SslSupportMethod: 'sni-only'
+          MinimumProtocolVersion: 'TLSv1.2_2021'
+
+  Route53RecordSetGroup:
+    Type: 'AWS::Route53::RecordSetGroup'
+    Condition: CreateDNSRecordsCondition
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      RecordSets:
+        - Name: !Ref SourceDomain
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+            HostedZoneId: 'Z2FDTNDATAQYW2'  # This is the Hosted Zone ID for CloudFront distributions
+            EvaluateTargetHealth: false
+        - Name: !Ref SourceDomain
+          Type: AAAA
+          AliasTarget:
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+            HostedZoneId: 'Z2FDTNDATAQYW2'  # This is the Hosted Zone ID for CloudFront distributions
+            EvaluateTargetHealth: false
+
+
+Outputs:
+
+  S3BucketName:
+    Description: "Name of the S3 bucket for the source domain"
+    Value: !Ref S3BucketForRedirect
+
+  CloudFrontDistributionDomainName:
+    Description: "Domain name of the CloudFront distribution used for the redirect"
+    Value: !GetAtt CloudFrontDistribution.DomainName

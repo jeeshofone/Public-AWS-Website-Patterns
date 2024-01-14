@@ -68,7 +68,7 @@ Resources:
         DefaultRootObject: index.html
         Comment: !Sub CloudFront distribution for ${AWS::StackName} redirect ${RootDomainName} to ${WWWDomainName}
         Enabled: true
-        HttpVersion: 'http2'
+        HttpVersion: 'http2and3'
         Origins:
           - Id: S3Origin
             DomainName: !GetAtt RedirectBucket.RegionalDomainName

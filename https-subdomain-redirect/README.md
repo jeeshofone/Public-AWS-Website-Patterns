@@ -58,8 +58,4 @@ Once the stack is deployed, it will automatically redirect all traffic from your
 
 ## Support
 
-If you encounter any issues with deploying or configuring your CloudFormation stack, please refer to the [AWS CloudFormation documentation](https://docs.aws.amazon.com/cloudformation/index.html) or reach out to the AWS support for assistance. Alternatively feel free to open a GitHub issue on this repository and I will do my best to help.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+For questions or issues, feel free to open an issue on the repository or submit a pull request with your suggested changes.
