@@ -90,7 +90,9 @@ Resources:
         CorsRules:
           - AllowedHeaders: ['*']
             AllowedMethods: ['GET']
-            AllowedOrigins: ['*']
+            AllowedOrigins: 
+              - !Sub 'http://${SourceDomain}'
+              - !Sub 'https://${SourceDomain}'
             MaxAge: 3000
 
   S3BucketPolicyForRedirect:

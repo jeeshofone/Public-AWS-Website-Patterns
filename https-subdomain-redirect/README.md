@@ -4,9 +4,13 @@ This CloudFormation stack is designed to redirect traffic from a root domain (e.
 
 ## Description
 
-This stack sets up all necessary resources to perform a 301 redirect from your root domain to your subdomain leveraging CloudFront's distribution system, an S3 bucket configured for web hosting, and Route 53 for domain name system management.
+This stack sets up all necessary resources to perform a URL redirect from your root domain to your subdomain leveraging CloudFront's distribution system, an S3 bucket configured for web hosting, and Route 53 for domain name system management.
 
 This is very useful for those using Substack to host their blog and want to redirect their root domain to their Substack blog. Substack does not support root domains, so this is a workaround to redirect users to your blog hosted on a subdomain.
+
+## Architecture Diagram
+
+![HTTPS Subdomain Redirect Architecture](https-subdomain-redirect.png)
 
 ## Key Components
 
