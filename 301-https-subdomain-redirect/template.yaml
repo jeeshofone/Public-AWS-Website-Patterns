@@ -24,7 +24,7 @@ Parameters:
     AllowedValues:
       - 'yes'
       - 'no'
-    Default: 'no'
+    Default: 'yes'
 
   ACMCertificateArn:
     Type: String
@@ -37,7 +37,7 @@ Parameters:
     AllowedValues:
       - 'yes'
       - 'no'
-    Default: 'no'
+    Default: 'yes'
 
 Conditions:
 
