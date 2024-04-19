@@ -1,0 +1,145 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for root domain to subdomain redirection using Lambda@Edge'
+
+Parameters:
+  SourceDomain:
+    Type: String
+    Description: 'The domain name that users will initially access'
+  DestinationDomain:
+    Type: String
+    Description: 'The domain name to which users will be redirected'
+  HostedZoneId:
+    Type: String
+    Description: 'The ID of the hosted zone containing the DNS records for the source domain'
+  CreateDNSRecords:
+    Type: String
+    AllowedValues: ['yes', 'no']
+    Default: 'yes'
+    Description: 'Specifies whether to create DNS records in Route 53'
+  ACMCertificateArn:
+    Type: String
+    Default: ''
+    Description: 'The ARN of an existing ACM certificate. If not provided, one may be created'
+  CreateACMCertificate:
+    Type: String
+    AllowedValues: ['yes', 'no']
+    Default: 'yes'
+    Description: 'Specifies whether to create a new ACM certificate if one is not provided'
+
+Conditions:
+  CreateDNSRecordsCondition: !Equals [!Ref CreateDNSRecords, 'yes']
+  UseExistingCertificateCondition: !Not [!Equals [!Ref ACMCertificateArn, '']]
+  CreateNewCertificateCondition: !And
+    - !Equals [!Ref CreateACMCertificate, 'yes']
+    - !Not [Condition: UseExistingCertificateCondition]
+
+Resources:
+  RedirectFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          'use strict';
+          
+          exports.handler = (event, context, callback) => {
+              const request = event.Records[0].cf.request;
+              const host = request.headers.host[0].value;
+              
+              if (host === '${SourceDomain}') {
+                  const response = {
+                      status: '301',
+                      statusDescription: 'Moved Permanently',
+                      headers: {
+                          location: [{
+                              key: 'Location',
+                              value: 'https://${DestinationDomain}' + request.uri
+                          }]
+                      }
+                  };
+                  callback(null, response);
+              } else {
+                  callback(null, request);
+              }
+          };
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: nodejs20.x
+      Timeout: 5
+      MemorySize: 128
+
+  RedirectFunctionVersion:
+    Type: AWS::Lambda::Version
+    Properties:
+      FunctionName: !Ref RedirectFunction
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - edgelambda.amazonaws.com
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        DefaultCacheBehavior:
+          ViewerProtocolPolicy: redirect-to-https
+          TargetOriginId: dummy-origin
+          MinTTL: 0
+          DefaultTTL: 300
+          MaxTTL: 1200
+          ForwardedValues:
+            QueryString: false
+          LambdaFunctionAssociations:
+            - EventType: origin-request
+              LambdaFunctionARN: !Ref RedirectFunctionVersion
+        Enabled: true
+        HttpVersion: http2
+        DefaultRootObject: index.html
+        Origins:
+          - Id: dummy-origin
+            DomainName: example.com
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+        ViewerCertificate:
+          AcmCertificateArn: !If [UseExistingCertificateCondition, !Ref ACMCertificateArn, !Ref ACMCertificateResource]
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+
+  ACMCertificateResource:
+    Type: AWS::CertificateManager::Certificate
+    Condition: CreateNewCertificateCondition
+    Properties:
+      DomainName: !Ref SourceDomain
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref SourceDomain
+          HostedZoneId: !Ref HostedZoneId
+
+  Route53RecordSetGroup:
+    Type: AWS::Route53::RecordSetGroup
+    Condition: CreateDNSRecordsCondition
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      RecordSets:
+        - Name: !Ref SourceDomain
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: !Ref SourceDomain
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
