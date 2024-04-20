@@ -2,6 +2,10 @@
 
 This CloudFormation template automates the process of redirecting requests from a root domain (e.g., `example.com`) to a subdomain (e.g., `www.example.com`) utilizing AWS Lambda@Edge, Amazon Route 53, and Amazon CloudFront.
 
+## Architecture Diagram
+
+![Lambda@Edge Redirection Architecture](Lambda%40Edge-301-https-subdomain-redirect.png)
+
 ## Description
 
 The provided CloudFormation stack deploys a serverless architecture to redirect users from a specified root domain to a target subdomain. This implementation is especially beneficial for users aiming to direct traffic from their main website to a blog or other subdomain-based services, achieving this with minimal latency worldwide through CloudFront.
