@@ -4,7 +4,7 @@ This CloudFormation template automates the process of redirecting requests from 
 
 ## Architecture Diagram
 
-![Lambda@Edge Redirection Architecture](Lambda%40Edge-301-https-subdomain-redirect.png)
+![Lambda@Edge Redirection Architecture](Lambda%40Edge-301-redirect.png)
 
 ## Description
 
