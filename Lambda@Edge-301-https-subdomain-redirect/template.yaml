@@ -38,28 +38,21 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       Code:
-        ZipFile: |
+        ZipFile: !Sub |
           'use strict';
-          
           exports.handler = (event, context, callback) => {
               const request = event.Records[0].cf.request;
-              const host = request.headers.host[0].value;
-              
-              if (host === '${SourceDomain}') {
-                  const response = {
-                      status: '301',
-                      statusDescription: 'Moved Permanently',
-                      headers: {
-                          location: [{
-                              key: 'Location',
-                              value: 'https://${DestinationDomain}' + request.uri
-                          }]
-                      }
-                  };
-                  callback(null, response);
-              } else {
-                  callback(null, request);
-              }
+              const response = {
+                  status: '301',
+                  statusDescription: 'Moved Permanently',
+                  headers: {
+                      location: [{
+                          key: 'Location',
+                          value: 'https://${DestinationDomain}' + request.uri
+                      }]
+                  }
+              };
+              callback(null, response);
           };
       Handler: index.handler
       Role: !GetAtt LambdaExecutionRole.Arn
@@ -83,39 +76,56 @@ Resources:
               Service:
                 - edgelambda.amazonaws.com
                 - lambda.amazonaws.com
-            Action:
-              - sts:AssumeRole
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: LambdaExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "arn:aws:logs:*:*:*"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Path: "/"
 
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
+        Enabled: true
+        HttpVersion: 'http2and3'
+        Comment: !Sub 'Redirect function distribution for ${SourceDomain} to ${DestinationDomain}'
         DefaultCacheBehavior:
-          ViewerProtocolPolicy: redirect-to-https
-          TargetOriginId: dummy-origin
-          MinTTL: 0
-          DefaultTTL: 300
-          MaxTTL: 1200
+          AllowedMethods:
+            - GET
+            - HEAD
+          Compress: true
           ForwardedValues:
             QueryString: false
+            Cookies:
+              Forward: none
           LambdaFunctionAssociations:
-            - EventType: origin-request
-              LambdaFunctionARN: !Ref RedirectFunctionVersion
-        Enabled: true
-        HttpVersion: http2
-        DefaultRootObject: index.html
+            - EventType: viewer-request
+              LambdaFunctionARN: !GetAtt RedirectFunctionVersion.FunctionArn
+          TargetOriginId: 'dummy'
+          ViewerProtocolPolicy: allow-all
         Origins:
-          - Id: dummy-origin
-            DomainName: example.com
-            CustomOriginConfig:
-              HTTPPort: 80
-              HTTPSPort: 443
-              OriginProtocolPolicy: https-only
+          - Id: 'dummy'
+            DomainName: !GetAtt DummyRedirectBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+            OriginAccessControlId: !GetAtt CloudFrontOriginAccessControl.Id
         ViewerCertificate:
-          AcmCertificateArn: !If [UseExistingCertificateCondition, !Ref ACMCertificateArn, !Ref ACMCertificateResource]
-          MinimumProtocolVersion: TLSv1.2_2021
+          AcmCertificateArn: !If [UseExistingCertificateCondition, !Ref ACMCertificateArn, !Ref 'ACMCertificateResource']
           SslSupportMethod: sni-only
+          MinimumProtocolVersion: 'TLSv1.2_2021'
+        PriceClass: PriceClass_All
+        Aliases:
+          - !Ref SourceDomain
 
   ACMCertificateResource:
     Type: AWS::CertificateManager::Certificate
@@ -143,3 +153,46 @@ Resources:
           AliasTarget:
             HostedZoneId: Z2FDTNDATAQYW2
             DNSName: !GetAtt CloudFrontDistribution.DomainName
+
+  DummyRedirectBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${SourceDomain}-redirect-bucket-${AWS::AccountId}
+      PublicAccessBlockConfiguration: 
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration: 
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: ['GET']
+            AllowedOrigins:
+              - !Sub https://${SourceDomain}
+            ExposedHeaders: ['Date']
+            MaxAge: 3600
+
+  DummyRedirectBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref DummyRedirectBucket
+      PolicyDocument:
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource: !Sub ${DummyRedirectBucket.Arn}/*
+          Principal:
+            Service: cloudfront.amazonaws.com
+          Condition:
+            StringEquals:
+              AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}
+  
+  CloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties: 
+      OriginAccessControlConfig:
+        Description: Default Origin Access Control
+        Name: !Ref AWS::StackName
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
