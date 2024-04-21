@@ -1,6 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CloudFormation template for setting up a fully private S3 bucket with a CloudFront distribution and Lambda@Edge.
-
+Description: CloudFormation template for setting up a fully private S3 bucket with a CloudFront distribution with OAI
 Parameters:
   DomainName:
     Type: String
@@ -37,13 +36,27 @@ Resources:
       Bucket: !Ref S3Bucket
       PolicyDocument:
         Statement:
-          - Effect: Deny
-            Principal: "*"
-            Action: 's3:*'
-            Resource: !Sub 'arn:aws:s3:::${S3BucketName}/*'
-            Condition:
-              StringNotEquals:
-                aws:Referer: "123cloud.st"
+          - Action: s3:GetObject
+            Effect: Allow
+            Resource: !Sub "${S3Bucket.Arn}/*"
+            Principal:
+              CanonicalUser: !GetAtt CloudFrontOAI.S3CanonicalUserId
+          - Action: s3:PutObject
+            Effect: Allow
+            Resource: !Sub "${S3Bucket.Arn}/*"
+            Principal:
+              AWS: !GetAtt LambdaExecutionRole.Arn
+          - Action: s3:ListBucket
+            Effect: Allow
+            Resource: !Sub "${S3Bucket.Arn}"
+            Principal:
+              AWS: !GetAtt LambdaExecutionRole.Arn
+          - Action: s3:DeleteObject
+            Effect: Allow
+            Resource: !Sub "${S3Bucket.Arn}/*"
+            Principal:
+              AWS: !GetAtt LambdaExecutionRole.Arn
+          
 
   CloudFrontOAI:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
@@ -89,48 +102,78 @@ Resources:
   HelloLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
+      Handler: index.lambda_handler
+      Runtime: python3.12
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
       Code:
         ZipFile: |
-          const AWS = require('aws-sdk');
-          const response = require('cfn-response');
-          const s3 = new AWS.S3();
-          
-          exports.handler = function(event, context) {
-            console.log("Request event: ", event);
-            const bucketName = event.ResourceProperties.BucketName;
-            
-            if (event.RequestType === 'Delete') {
-              // Respond success immediately upon delete event to avoid delays in stack deletion
-              response.send(event, context, response.SUCCESS);
-              return;
-            }
-            
-            // For Create and Update events
-            const params = {
-              Bucket: bucketName,
-              Key: 'index.html',
-              Body: '<html><head><title>Hello World</title></head><body><p>Hello World from <a href="https://123cloud.st">123cloud.st</a>!</p></body></html>',
-              ContentType: 'text/html'
-            };
-            
-            s3.putObject(params, function(err, data) {
-              if (err) {
-                console.log("Error: ", err);
-                response.send(event, context, response.FAILED);
-              } else {
-                console.log("Data: ", data);
-                response.send(event, context, response.SUCCESS);
-              }
-            });
-      Handler: index.handler
-      Runtime: nodejs20.x
-      Role: !GetAtt LambdaExecutionRole.Arn
+          import json
+          import boto3
+          import cfnresponse
+
+          def lambda_handler(event, context):
+              print("Received event:", json.dumps(event))
+              s3 = boto3.client('s3')
+              
+              if event['RequestType'] == 'Delete':
+                  bucket_name = event.get('ResourceProperties', {}).get('BucketName')
+                  print(f"Delete event received for resource {event.get('PhysicalResourceId')}. Starting bucket emptying process.")
+                  
+                  if not bucket_name:
+                      print("Error: BucketName not found in event.")
+                      cfnresponse.send(event, context, cfnresponse.FAILED, {"Error": "Missing bucket name during delete"}, event['PhysicalResourceId'])
+                      return
+
+                  # Attempt to list and delete all objects in the bucket
+                  try:
+                      response = s3.list_objects_v2(Bucket=bucket_name)
+                      if 'Contents' in response:
+                          for obj in response['Contents']:
+                              s3.delete_object(Bucket=bucket_name, Key=obj['Key'])
+                          print("Bucket emptied successfully.")
+                      else:
+                          print("Bucket is already empty.")
+
+                      # After successfully emptying the bucket, send a success response.
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, event['PhysicalResourceId'])
+                  
+                  except Exception as e:
+                      print(f"Error emptying the bucket: {str(e)}")
+                      # If errors occur, send a failed response.
+                      cfnresponse.send(event, context, cfnresponse.FAILED, {"Error": str(e)}, event['PhysicalResourceId'])
+                  return
+
+              if event["RequestType"] == "Create":
+                  bucket_name = event.get("ResourceProperties", {}).get("BucketName")
+                  
+                  if not bucket_name:
+                      print("Error: BucketName not found in event.")
+                      cfnresponse.send(event, context, cfnresponse.FAILED, {"Error": "Missing bucket name"})
+                      return
+
+                  # Create object in S3 bucket for "Create" events.
+                  try:
+                      response = s3.put_object(
+                          Bucket=bucket_name,
+                          Key="index.html",
+                          ContentType="text/html",
+                          Body="<html><head><title>Hello World</title></head><body><p>Hello World from <a href='https://123cloud.st'>123cloud.st</a>!</p></body></html>"
+                      )
+                      print("PutObject response:", response)
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData={"Status": "Success"})
+                  
+                  except Exception as e:
+                      print("Error in s3.putObject:", str(e))
+                      cfnresponse.send(event, context, cfnresponse.FAILED, {"Error": str(e)})
+
 
   S3BucketSetup:
     Type: AWS::CloudFormation::CustomResource
     Properties:
       ServiceToken: !GetAtt HelloLambdaFunction.Arn
       BucketName: !Ref S3Bucket
+    DependsOn: [HelloLambdaFunction, S3Bucket, S3BucketPolicy, CloudFrontDistribution, LambdaExecutionRole]
 
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -154,7 +197,11 @@ Resources:
                   - 'logs:PutLogEvents'
                 Resource: 'arn:aws:logs:*:*:*'
               - Effect: Allow
-                Action: 's3:PutObject'
+                Action:
+                  - 's3:GetObject'
+                  - 's3:ListBucket'
+                  - 's3:DeleteObject'
+                  - 's3:PutObject'
                 Resource: !Sub 'arn:aws:s3:::${S3BucketName}/*'
               - Effect: Allow
                 Action: 'cloudformation:SignalResource'
