@@ -1,0 +1,193 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template for setting up a fully private S3 bucket with a CloudFront distribution and Lambda@Edge.
+
+Parameters:
+  DomainName:
+    Type: String
+    Description: The domain name for the CloudFront distribution.
+  S3BucketName:
+    Type: String
+    Description: The name of the S3 bucket to create and use.
+  HostedZoneId:
+    Type: String
+    Description: The ID of the hosted zone in Route 53 where the domain name is registered.
+
+Resources:
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref S3BucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: ['GET']
+            AllowedOrigins: [ !Sub "https://${DomainName}" ]
+            ExposedHeaders: ['Date']
+            MaxAge: 3600
+
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Statement:
+          - Effect: Deny
+            Principal: "*"
+            Action: 's3:*'
+            Resource: !Sub 'arn:aws:s3:::${S3BucketName}/*'
+            Condition:
+              StringNotEquals:
+                aws:Referer: "123cloud.st"
+
+  CloudFrontOAI:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub 'OAI for ${DomainName}'
+
+  ACMCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !Ref HostedZoneId
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        HttpVersion: 'http2and3'
+        Aliases: [ !Ref DomainName ]
+        DefaultRootObject: index.html
+        DefaultCacheBehavior:
+          ViewerProtocolPolicy: redirect-to-https
+          TargetOriginId: S3Origin
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          Compress: true
+        Origins:
+          - DomainName: !GetAtt S3Bucket.DomainName
+            Id: S3Origin
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI}'
+        ViewerCertificate:
+          AcmCertificateArn: !Ref ACMCertificate
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: 'TLSv1.2_2021'
+
+  HelloLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          const AWS = require('aws-sdk');
+          const response = require('cfn-response');
+          const s3 = new AWS.S3();
+          
+          exports.handler = function(event, context) {
+            console.log("Request event: ", event);
+            const bucketName = event.ResourceProperties.BucketName;
+            
+            if (event.RequestType === 'Delete') {
+              // Respond success immediately upon delete event to avoid delays in stack deletion
+              response.send(event, context, response.SUCCESS);
+              return;
+            }
+            
+            // For Create and Update events
+            const params = {
+              Bucket: bucketName,
+              Key: 'index.html',
+              Body: '<html><head><title>Hello World</title></head><body><p>Hello World from <a href="https://123cloud.st">123cloud.st</a>!</p></body></html>',
+              ContentType: 'text/html'
+            };
+            
+            s3.putObject(params, function(err, data) {
+              if (err) {
+                console.log("Error: ", err);
+                response.send(event, context, response.FAILED);
+              } else {
+                console.log("Data: ", data);
+                response.send(event, context, response.SUCCESS);
+              }
+            });
+      Handler: index.handler
+      Runtime: nodejs20.x
+      Role: !GetAtt LambdaExecutionRole.Arn
+
+  S3BucketSetup:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt HelloLambdaFunction.Arn
+      BucketName: !Ref S3Bucket
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: LambdaExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action: 's3:PutObject'
+                Resource: !Sub 'arn:aws:s3:::${S3BucketName}/*'
+              - Effect: Allow
+                Action: 'cloudformation:SignalResource'
+                Resource: '*'
+
+  Route53RecordSet:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+  
+  Route53RecordSet2:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: AAAA
+      AliasTarget:
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+
+Outputs:
+  BucketName:
+    Description: "Name of the S3 bucket"
+    Value: !Ref S3Bucket
+  CloudFrontDistribution:
+    Description: "CloudFront distribution DNS name"
+    Value: !GetAtt CloudFrontDistribution.DomainName
+  LambdaFunction:
+    Description: "Lambda function ARN"
+    Value: !GetAtt HelloLambdaFunction.Arn
+
