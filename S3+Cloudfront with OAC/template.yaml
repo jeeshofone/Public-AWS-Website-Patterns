@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CloudFormation template for setting up a fully private S3 bucket with a CloudFront distribution with OAI
+Description: CloudFormation template for setting up a fully private S3 bucket with a CloudFront distribution with OAC
 Parameters:
   DomainName:
     Type: String
@@ -40,7 +40,10 @@ Resources:
             Effect: Allow
             Resource: !Sub "${S3Bucket.Arn}/*"
             Principal:
-              CanonicalUser: !GetAtt CloudFrontOAI.S3CanonicalUserId
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}
           - Action: s3:PutObject
             Effect: Allow
             Resource: !Sub "${S3Bucket.Arn}/*"
@@ -57,11 +60,15 @@ Resources:
             Principal:
               AWS: !GetAtt LambdaExecutionRole.Arn
           
-  CloudFrontOAI:
-    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
-    Properties:
-      CloudFrontOriginAccessIdentityConfig:
-        Comment: !Sub 'OAI for ${DomainName}'
+  CloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties: 
+      OriginAccessControlConfig:
+        Description: Default Origin Access Control
+        Name: !Ref AWS::StackName
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
 
   ACMCertificate:
     Type: AWS::CertificateManager::Certificate
@@ -92,7 +99,8 @@ Resources:
           - DomainName: !GetAtt S3Bucket.DomainName
             Id: S3Origin
             S3OriginConfig:
-              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI}'
+              OriginAccessIdentity: ''
+            OriginAccessControlId: !GetAtt CloudFrontOriginAccessControl.Id
         ViewerCertificate:
           AcmCertificateArn: !Ref ACMCertificate
           SslSupportMethod: sni-only

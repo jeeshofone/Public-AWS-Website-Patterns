@@ -1,14 +1,10 @@
-> **Caution - You probably don't want to use this template without evaluating the template in the S3+Cloudfront with OAC folder.**
-> This template is a copy of the OAC template with the OAC references replaced with OAI.
-> The OAI template in this folder does work as expected but as OAI is now a legacy feature, it is recommended to use the OAC template instead.
-
-# Secure S3 Content Delivery with CloudFront and CORS Configuration (OAI)
+# Secure S3 Content Delivery with CloudFront and CORS Configuration (OAC)
 
 This comprehensive CloudFormation template assembles a secure content delivery architecture using Amazon S3, Amazon CloudFront, AWS Lambda, and proper Cross-Origin Resource Sharing (CORS) settings for your web assets. Ideal for serving static content with enhanced security and global performance, this setup is pivotal for applications requiring stringent privacy coupled with swift, global access.
 
 ## Architecture Diagram
 
-![S3, CloudFront, Lambda, and CORS Setup](S3-Cloudfront-OAI.png)
+![S3, CloudFront, Lambda, and CORS Setup](S3-Cloudfront-OAC.png)
 
 ## Description
 
@@ -38,7 +34,7 @@ Incorporating key AWS services, the architecture ensures secure and efficient co
 
 1. **Access AWS CloudFormation**: Log into the AWS Console and select the CloudFormation service.
 2. **Launch New Stack**: Initiate the creation of a new stack by inputting this CloudFormation template.
-3. **Configure Parameters**: Provide details like your domain name, S3 bucket name and hosted zone ID for Route 53.
+3. **Configure Parameters**: Provide details like your domain name, S3 bucket name, and hosted zone ID for Route 53.
 4. **Deploy**: Confirm your configurations and deploy the stack. Progress can be tracked within the CloudFormation interface.
 
 Post-deployment, your infrastructure is ready, with cross-origin access aligned with your specified CORS policies.
