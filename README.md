@@ -4,8 +4,7 @@ Welcome to the Public AWS Website Patterns repository. This collection of CloudF
 
 ## Companion Blog Post
 
-For a deeper exploration of these patterns and a guide on how to adapt them to your specific needs, please visit our companion blog post at <blog-post-url-here>. The blog post provides additional insights and contextual information, enhancing your understanding and application of the templates provided here.
-
+For a deeper exploration of these patterns and a guide on how to adapt them to your specific needs, please visit my [Companion Blog Post](https://www.123cloud.st/p/the-complete-reference-guide-to-basic)
 ## Patterns Overview
 
 - **301 HTTPS Subdomain Redirect**: Redirect traffic from one subdomain to another using S3 and CloudFront.
