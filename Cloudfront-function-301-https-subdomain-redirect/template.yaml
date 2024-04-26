@@ -37,7 +37,8 @@ Resources:
   CloudFrontFunction:
     Type: AWS::CloudFront::Function
     Properties:
-      Name: !Ref AWS::StackName
+      Name: RedirectFunction
+      AutoPublish: true
       FunctionConfig:
         Comment: !Sub 'Redirects ${SourceDomain} to ${DestinationDomain}'
         Runtime: cloudfront-js-2.0
