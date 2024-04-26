@@ -37,7 +37,7 @@ Resources:
   CloudFrontFunction:
     Type: AWS::CloudFront::Function
     Properties:
-      Name: !Sub '${SourceDomain}-redirect-function'
+      Name: !Ref AWS::StackName
       FunctionConfig:
         Comment: !Sub 'Redirects ${SourceDomain} to ${DestinationDomain}'
         Runtime: cloudfront-js-2.0
