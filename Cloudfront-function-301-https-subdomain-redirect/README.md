@@ -1,65 +1,61 @@
-# AWS Root Domain to Subdomain Redirect using Lambda@Edge
+# CloudFront Function 301 Redirect with HTTPS
 
-This CloudFormation template automates the process of redirecting requests from a root domain (e.g., `example.com`) to a subdomain (e.g., `www.example.com`) utilizing AWS Lambda@Edge, Amazon Route 53, and Amazon CloudFront.
+This CloudFormation template automates the process of redirecting requests from a root domain (e.g., `example.com`) to a subdomain (e.g., `www.example.com`) or from one domain(e.g., `123street.cloud`) to another (e.g., `123cloud.st`) using AWS CloudFront Functions, Amazon Route 53, and an AWS Certificate Manager (ACM) Certificate for SSL/TLS certificates.
 
 ## Architecture Diagram
 
-![Lambda@Edge Redirection Architecture](Lambda%40Edge-301-redirect.png)
+![Redirection Architecture](Cloudfront-function-301-redirect.png)
 
 ## Description
 
-The provided CloudFormation stack deploys a serverless architecture to redirect users from a specified root domain to a target subdomain. This implementation is especially beneficial for users aiming to direct traffic from their main website to a blog or other subdomain-based services, achieving this with minimal latency worldwide through CloudFront.
+The CloudFormation stack deploys a streamlined architecture to redirect queries from a root domain to a desired subdomain. This is particularly useful for directing main site traffic to a blog or other specialized services. The redirection is facilitated globally with minimal latency using Amazon CloudFront.
 
-## Key Features
+## Features
 
-- **Serverless Redirection**: Utilizes Lambda@Edge for efficient, serverless redirection from root domain to subdomain.
-- **Global Performance**: Amazon CloudFront distribution ensures low-latency redirects worldwide.
-- **SSL/TLS**: Supports HTTPS redirection through an ACM Certificate, enhancing security.
-- **Automated DNS Setup**: Optionally creates Route 53 DNS records for seamless integration.
+- **Serverless Redirection**: Employs CloudFront Functions to handle redirection without needing a server setup.
+- **Global Reach**: Ensures low-latency redirects worldwide through the Amazon CloudFront CDN.
+- **Secured Redirection**: Supports HTTPS through ACM, enhancing security during transfers.
+- **DNS Management**: Includes an option to manage DNS records in Amazon Route 53 for the root domain.
 
-## Architecture Overview
+## Components
 
-The solution involves the following AWS services:
-- **AWS Lambda@Edge**: Inspects incoming requests and performs HTTP 301 redirects to the target subdomain.
-- **Amazon CloudFront**: Globally distributed CDN that serves the redirect responses with low latency.
-- **Amazon Route 53**: Manages DNS records, directing traffic to the correct CloudFront distribution.
-- **AWS Certificate Manager (ACM)**: Manages SSL/TLS certificates for secure redirection over HTTPS.
+- **AWS CloudFront Functions**: Checks incoming requests and redirects them to the specified subdomain.
+- **Amazon CloudFront**: Serves as the content delivery network to dispatch the redirections efficiently.
+- **Amazon Route 53**: Manages DNS setups, ensuring queries to the root domain are pointed to the correct CDN.
+- **AWS Certificate Manager (ACM)**: (Optional) Manages SSL/TLS certificates to secure redirections.
 
 ## Prerequisites
 
-- An owned domain with its DNS managed by Amazon Route 53.
-- If performing HTTPS redirects, an ACM Certificate must be available in the `us-east-1` region due to CloudFront requirements.
+- Domain ownership with DNS managed via Amazon Route 53.
+- An ACM certificate in the `us-east-1` region if setting up HTTPS redirection. One will be created if not provided.
 
 ## Parameters
 
-The template requires the following parameters to be set:
+- `SourceDomain`: Your root domain, e.g., `123street.cloud`.
+- `DestinationDomain`: Your target domain, e.g., `123cloud.st`.
+- `HostedZoneId`: The Route 53 hosted zone ID for your root domain.
+- `CreateDNSRecords`: Choose whether to auto-generate Route 53 DNS records (yes/no).
+- `ACMCertificateArn`: ARN of an existing ACM certificate, if available.
+- `CreateACMCertificate`: Whether to create a new ACM certificate if none is provided (yes/no).
 
-- `SourceDomain`: The root domain from which traffic will be redirected (e.g., `example.com`).
-- `DestinationDomain`: The target subdomain to direct traffic to (e.g., `www.example.com`).
-- `HostedZoneId`: Route 53 hosted zone ID associated with the `SourceDomain`.
-- `CreateDNSRecords`: Option to automatically create Route 53 A and AAAA records (yes/no).
-- `ACMCertificateArn`: (Optional) ARN of an existing ACM certificate. A new one will be created if not supplied and `CreateACMCertificate` is set to `yes`.
-- `CreateACMCertificate`: Indicates whether a new ACM certificate should be created if `ACMCertificateArn` is not provided (yes/no).
+## Deployment
 
-## Deployment Steps
+1. Access the AWS Management Console.
+2. Navigate to CloudFormation and initiate a new stack creation.
+3. Upload or input the template.
+4. Enter the required parameters as prompted.
+5. Deploy the stack.
 
-1. Log into the AWS Management Console.
-2. Navigate to the CloudFormation service and choose to create a new stack.
-3. Upload or copy and paste the template into CloudFormation.
-4. Fill in the required parameters when prompted.
-5. Launch the stack.
-
-Upon successful deployment, any requests made to your root domain will be redirected to the specified subdomain using the HTTPS protocol.
+Post-deployment, any access to the root domain will be redirected to the designated domain or subdomain using HTTPS if configured.
 
 ## Maintenance and Contributions
 
-- To update the redirection logic or configuration, modify the Lambda@Edge function code within the stack and redeploy.
-- Contributions and suggestions are welcome. Please fork the repository and submit pull requests with enhancements.
+Adjustments to the redirection or configurations can be done by modifying the CloudFront Function within the stack and updating the deployment. Contributions to the template via GitHub forks and pull requests are encouraged.
 
-## Contact and Support
+## Support and Issues
 
-For support or to report issues, please open a GitHub issue on the repository page where this CloudFormation template is hosted.
+For support or issue reporting, open an issue on the GitHub repository page.
 
-## License
+## Licensing
 
-This template is released under the MIT License. See the LICENSE file in the repository for full details.
+Released under the MIT License. See the repository's LICENSE file for details.
