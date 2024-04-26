@@ -83,6 +83,7 @@ Resources:
           SslSupportMethod: sni-only
           MinimumProtocolVersion: 'TLSv1.2_2021'
         PriceClass: PriceClass_All
+        Aliases:
           - !Ref SourceDomain
 
   ACMCertificateResource:
