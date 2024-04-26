@@ -69,6 +69,10 @@ Resources:
             - HEAD
           Compress: true
           TargetOriginId: 'dummy'
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: 'none'
           FunctionAssociations:
             - EventType: viewer-request
               FunctionARN: !GetAtt CloudFrontFunction.FunctionARN

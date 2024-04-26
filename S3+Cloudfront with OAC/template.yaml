@@ -83,6 +83,7 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
+        Comment: !Sub 'OAC Distribution for ${DomainName}'
         Enabled: true
         HttpVersion: 'http2and3'
         Aliases: [ !Ref DomainName ]

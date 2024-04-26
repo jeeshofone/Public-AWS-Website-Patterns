@@ -76,6 +76,7 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
+        Comment: !Sub 'OAI Distribution for ${DomainName}'
         Enabled: true
         HttpVersion: 'http2and3'
         Aliases: [ !Ref DomainName ]
