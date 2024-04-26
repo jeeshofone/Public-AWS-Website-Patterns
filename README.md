@@ -5,10 +5,12 @@ Welcome to the Public AWS Website Patterns repository. This collection of CloudF
 ## Companion Blog Post
 
 For a deeper exploration of these patterns and a guide on how to adapt them to your specific needs, please visit my [Companion Blog Post](https://www.123cloud.st/p/the-complete-reference-guide-to-basic)
+
 ## Patterns Overview
 
 - **301 HTTPS Subdomain Redirect**: Redirect traffic from one subdomain to another using S3 and CloudFront.
-- **Lambda@Edge 301 HTTPS Subdomain Redirect**: Employ Lambda@Edge for subdomain redirection, offering a serverless solution for SEO-friendly URLs.
+- **Lambda@Edge 301 HTTPS Subdomain Redirect**: Employ Lambda@Edge for redirection, offering a serverless solution for SEO-friendly URLs.
+- **CloudFront Functions 301 Root to WWW Redirect**: Leverage CloudFront Functions for efficient, scalable, and cost-effective redirection from anywhere to anywhere.
 - **S3+Cloudfront with OAC (Origin Access Control)**: Set up a secure content delivery network with S3 and CloudFront using origin access controls to manage CORS settings and enhance security.
 - **S3+Cloudfront with OAI (Origin Access Identity)**: Similar to the OAC example, but uses the CloudFront Origin Access Identity for S3 bucket access.
 - **HTTPS Subdomain Redirect**: Redirect from a root domain to a WWW subdomain using CloudFront and Lambda, suitable for platforms that do not support apex domain hosting such as Substack.
@@ -36,6 +38,4 @@ This project is licensed under the terms of the MIT license.
 
 ## Support
 
-For questions or support regarding these deployment patterns, please open an issue in this repository. U aim to assist and address any deployments issues or inquiries you may have.
-
-Thank you for visiting the Public AWS Website Patterns repository. I hope these templates help you effectively deploy and manage your AWS-based web infrastructure!
+For questions or support regarding these deployment patterns, please open an issue in this repository. We aim to assist and address any deployment issues or inquiries you may have.
