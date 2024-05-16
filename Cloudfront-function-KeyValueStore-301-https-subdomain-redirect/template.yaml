@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for root domain to subdomain redirection using CloudFront Functions'
+
+Parameters:
+  SourceDomain:
+    Type: String
+    Description: 'The domain name that users will initially access'
+  DestinationDomain:
+    Type: String
+    Description: 'The domain name to which users will be redirected'
+  HostedZoneId:
+    Type: String
+    Description: 'The ID of the hosted zone containing the DNS records for the source domain'
+  CreateDNSRecords:
+    Type: String
+    AllowedValues: ['yes', 'no']
+    Default: 'yes'
+    Description: 'Specifies whether to create DNS records in Route 53'
+  ACMCertificateArn:
+    Type: String
+    Default: ''
+    Description: 'The ARN of an existing ACM certificate. If not provided, one may be created'
+  CreateACMCertificate:
+    Type: String
+    AllowedValues: ['yes', 'no']
+    Default: 'yes'
+    Description: 'Specifies whether to create a new ACM certificate if one is not provided'
+
+Conditions:
+  CreateDNSRecordsCondition: !Equals [!Ref CreateDNSRecords, 'yes']
+  UseExistingCertificateCondition: !Not [!Equals [!Ref ACMCertificateArn, '']]
+  CreateNewCertificateCondition: !And
+    - !Equals [!Ref CreateACMCertificate, 'yes']
+    - !Not [Condition: UseExistingCertificateCondition]
+
+Resources:
+  CloudFrontFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: RedirectFunction
+      AutoPublish: true
+      FunctionConfig:
+        Comment: !Sub 'Redirects ${SourceDomain} to ${DestinationDomain}'
+        Runtime: cloudfront-js-2.0
+      FunctionCode: !Sub |
+        function handler(event) {
+          var request = event.request;
+          var response = {
+            statusCode: 301,
+            statusDescription: 'Moved Permanently',
+            headers: {
+              location: { value: 'https://${DestinationDomain}' + request.uri }
+            }
+          };
+          return response;
+        }
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        HttpVersion: 'http2and3'
+        Comment: !Sub 'Redirect function distribution for ${SourceDomain} to ${DestinationDomain}'
+        DefaultCacheBehavior:
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          TargetOriginId: 'dummy'
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: 'none'
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt CloudFrontFunction.FunctionARN
+        Origins:
+          - Id: 'dummy'
+            DomainName: 'example.com'
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
+        ViewerCertificate:
+          AcmCertificateArn: !If [UseExistingCertificateCondition, !Ref ACMCertificateArn, !Ref 'ACMCertificateResource']
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: 'TLSv1.2_2021'
+        PriceClass: PriceClass_All
+        Aliases:
+          - !Ref SourceDomain
+
+  ACMCertificateResource:
+    Type: AWS::CertificateManager::Certificate
+    Condition: CreateNewCertificateCondition
+    Properties:
+      DomainName: !Ref SourceDomain
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref SourceDomain
+          HostedZoneId: !Ref HostedZoneId
+
+  Route53RecordSetGroup:
+    Type: AWS::Route53::RecordSetGroup
+    Condition: CreateDNSRecordsCondition
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      RecordSets:
+        - Name: !Ref SourceDomain
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: !Ref SourceDomain
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
