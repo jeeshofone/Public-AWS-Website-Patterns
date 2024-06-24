@@ -1,0 +1,1183 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for root domain to subdomain redirection using CloudFront Functions'
+
+Parameters:
+  DestinationDomain:
+    Type: String
+    Default: '123cloud.st'
+    Description: 'The domain name to which users will be redirected'
+  HostedZoneId:
+    Type: String
+    Description: 'The ID of the hosted zone containing the DNS records for the source domains'
+  CreateDNSRecords:
+    Type: String
+    AllowedValues: ['yes', 'no']
+    Default: 'yes'
+    Description: 'Specifies whether to create DNS records in Route 53'
+  ACMCertificateArn:
+    Type: String
+    Default: ''
+    Description: 'The ARN of an existing ACM certificate. If not provided, one may be created'
+  CreateACMCertificate:
+    Type: String
+    AllowedValues: ['yes', 'no']
+    Default: 'yes'
+    Description: 'Specifies whether to create a new ACM certificate if one is not provided'
+
+Conditions:
+  CreateDNSRecordsCondition: !Equals [!Ref CreateDNSRecords, 'yes']
+  UseExistingCertificateCondition: !Not [!Equals [!Ref ACMCertificateArn, '']]
+  CreateNewCertificateCondition: !And
+    - !Equals [!Ref CreateACMCertificate, 'yes']
+    - !Not [Condition: UseExistingCertificateCondition]
+
+Resources:
+  CloudFrontFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: RedirectFunction
+      AutoPublish: true
+      FunctionConfig:
+        Comment: 'Redirects subdomains to ${DestinationDomain}'
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var request = event.request;
+          var response = {
+            statusCode: 301,
+            statusDescription: 'Moved Permanently',
+            headers: {
+              location: { value: 'https://123cloud.st' + request.uri }
+            }
+          };
+          return response;
+        }
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        HttpVersion: 'http2and3'
+        Comment: 'Redirect function distribution for subdomains 1-77.123street.cloud to ${DestinationDomain}'
+        DefaultCacheBehavior:
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          TargetOriginId: 'dummy'
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: 'none'
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt CloudFrontFunction.FunctionARN
+        Origins:
+          - Id: 'dummy'
+            DomainName: 'example.com'
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
+        ViewerCertificate:
+          AcmCertificateArn: !If [UseExistingCertificateCondition, !Ref ACMCertificateArn, !Ref 'ACMCertificateResource']
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: 'TLSv1.2_2021'
+        PriceClass: PriceClass_All
+        Aliases:
+          - '1.123street.cloud'
+          - '2.123street.cloud'
+          - '3.123street.cloud'
+          - '4.123street.cloud'
+          - '5.123street.cloud'
+          - '6.123street.cloud'
+          - '7.123street.cloud'
+          - '8.123street.cloud'
+          - '9.123street.cloud'
+          - '10.123street.cloud'
+          - '11.123street.cloud'
+          - '12.123street.cloud'
+          - '13.123street.cloud'
+          - '14.123street.cloud'
+          - '15.123street.cloud'
+          - '16.123street.cloud'
+          - '17.123street.cloud'
+          - '18.123street.cloud'
+          - '19.123street.cloud'
+          - '20.123street.cloud'
+          - '21.123street.cloud'
+          - '22.123street.cloud'
+          - '23.123street.cloud'
+          - '24.123street.cloud'
+          - '25.123street.cloud'
+          - '26.123street.cloud'
+          - '27.123street.cloud'
+          - '28.123street.cloud'
+          - '29.123street.cloud'
+          - '30.123street.cloud'
+          - '31.123street.cloud'
+          - '32.123street.cloud'
+          - '33.123street.cloud'
+          - '34.123street.cloud'
+          - '35.123street.cloud'
+          - '36.123street.cloud'
+          - '37.123street.cloud'
+          - '38.123street.cloud'
+          - '39.123street.cloud'
+          - '40.123street.cloud'
+          - '41.123street.cloud'
+          - '42.123street.cloud'
+          - '43.123street.cloud'
+          - '44.123street.cloud'
+          - '45.123street.cloud'
+          - '46.123street.cloud'
+          - '47.123street.cloud'
+          - '48.123street.cloud'
+          - '49.123street.cloud'
+          - '50.123street.cloud'
+          - '51.123street.cloud'
+          - '52.123street.cloud'
+          - '53.123street.cloud'
+          - '54.123street.cloud'
+          - '55.123street.cloud'
+          - '56.123street.cloud'
+          - '57.123street.cloud'
+          - '58.123street.cloud'
+          - '59.123street.cloud'
+          - '60.123street.cloud'
+          - '61.123street.cloud'
+          - '62.123street.cloud'
+          - '63.123street.cloud'
+          - '64.123street.cloud'
+          - '65.123street.cloud'
+          - '66.123street.cloud'
+          - '67.123street.cloud'
+          - '68.123street.cloud'
+          - '69.123street.cloud'
+          - '70.123street.cloud'
+          - '71.123street.cloud'
+          - '72.123street.cloud'
+          - '73.123street.cloud'
+          - '74.123street.cloud'
+          - '75.123street.cloud'
+          - '76.123street.cloud'
+          - '77.123street.cloud'
+
+  ACMCertificateResource:
+    Type: AWS::CertificateManager::Certificate
+    Condition: CreateNewCertificateCondition
+    Properties:
+      DomainName: '1.123street.cloud'
+      SubjectAlternativeNames:
+        - '1.123street.cloud'
+        - '2.123street.cloud'
+        - '3.123street.cloud'
+        - '4.123street.cloud'
+        - '5.123street.cloud'
+        - '6.123street.cloud'
+        - '7.123street.cloud'
+        - '8.123street.cloud'
+        - '9.123street.cloud'
+        - '10.123street.cloud'
+        - '11.123street.cloud'
+        - '12.123street.cloud'
+        - '13.123street.cloud'
+        - '14.123street.cloud'
+        - '15.123street.cloud'
+        - '16.123street.cloud'
+        - '17.123street.cloud'
+        - '18.123street.cloud'
+        - '19.123street.cloud'
+        - '20.123street.cloud'
+        - '21.123street.cloud'
+        - '22.123street.cloud'
+        - '23.123street.cloud'
+        - '24.123street.cloud'
+        - '25.123street.cloud'
+        - '26.123street.cloud'
+        - '27.123street.cloud'
+        - '28.123street.cloud'
+        - '29.123street.cloud'
+        - '30.123street.cloud'
+        - '31.123street.cloud'
+        - '32.123street.cloud'
+        - '33.123street.cloud'
+        - '34.123street.cloud'
+        - '35.123street.cloud'
+        - '36.123street.cloud'
+        - '37.123street.cloud'
+        - '38.123street.cloud'
+        - '39.123street.cloud'
+        - '40.123street.cloud'
+        - '41.123street.cloud'
+        - '42.123street.cloud'
+        - '43.123street.cloud'
+        - '44.123street.cloud'
+        - '45.123street.cloud'
+        - '46.123street.cloud'
+        - '47.123street.cloud'
+        - '48.123street.cloud'
+        - '49.123street.cloud'
+        - '50.123street.cloud'
+        - '51.123street.cloud'
+        - '52.123street.cloud'
+        - '53.123street.cloud'
+        - '54.123street.cloud'
+        - '55.123street.cloud'
+        - '56.123street.cloud'
+        - '57.123street.cloud'
+        - '58.123street.cloud'
+        - '59.123street.cloud'
+        - '60.123street.cloud'
+        - '61.123street.cloud'
+        - '62.123street.cloud'
+        - '63.123street.cloud'
+        - '64.123street.cloud'
+        - '65.123street.cloud'
+        - '66.123street.cloud'
+        - '67.123street.cloud'
+        - '68.123street.cloud'
+        - '69.123street.cloud'
+        - '70.123street.cloud'
+        - '71.123street.cloud'
+        - '72.123street.cloud'
+        - '73.123street.cloud'
+        - '74.123street.cloud'
+        - '75.123street.cloud'
+        - '76.123street.cloud'
+        - '77.123street.cloud'
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: '1.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '2.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '3.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '4.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '5.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '6.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '7.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '8.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '9.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '10.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '11.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '12.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '13.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '14.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '15.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '16.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '17.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '18.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '19.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '20.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '21.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '22.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '23.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '24.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '25.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '26.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '27.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '28.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '29.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '30.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '31.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '32.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '33.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '34.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '35.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '36.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '37.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '38.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '39.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '40.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '41.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '42.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '43.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '44.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '45.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '46.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '47.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '48.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '49.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '50.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '51.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '52.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '53.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '54.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '55.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '56.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '57.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '58.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '59.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '60.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '61.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '62.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '63.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '64.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '65.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '66.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '67.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '68.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '69.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '70.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '71.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '72.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '73.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '74.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '75.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '76.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: '77.123street.cloud'
+          HostedZoneId: !Ref HostedZoneId
+
+  Route53RecordSetGroup:
+    Type: AWS::Route53::RecordSetGroup
+    Condition: CreateDNSRecordsCondition
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      RecordSets:
+        - Name: '1.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '1.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '2.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '2.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '3.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '3.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '4.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '4.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '5.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '5.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '6.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '6.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '7.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '7.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '8.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '8.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '9.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '9.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '10.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '10.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '11.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '11.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '12.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '12.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '13.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '13.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '14.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '14.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '15.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '15.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '16.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '16.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '17.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '17.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '18.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '18.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '19.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '19.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '20.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '20.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '21.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '21.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '22.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '22.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '23.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '23.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '24.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '24.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '25.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '25.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '26.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '26.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '27.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '27.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '28.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '28.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '29.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '29.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '30.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '30.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '31.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '31.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '32.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '32.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '33.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '33.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '34.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '34.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '35.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '35.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '36.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '36.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '37.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '37.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '38.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '38.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '39.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '39.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '40.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '40.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '41.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '41.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '42.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '42.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '43.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '43.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '44.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '44.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '45.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '45.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '46.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '46.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '47.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '47.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '48.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '48.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '49.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '49.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '50.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '50.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '51.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '51.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '52.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '52.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '53.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '53.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '54.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '54.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '55.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '55.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '56.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '56.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '57.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '57.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '58.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '58.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '59.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '59.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '60.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '60.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '61.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '61.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '62.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '62.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '63.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '63.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '64.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '64.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '65.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '65.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '66.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '66.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '67.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '67.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '68.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '68.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '69.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '69.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '70.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '70.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '71.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '71.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '72.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '72.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '73.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '73.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '74.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '74.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '75.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '75.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '76.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '76.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '77.123street.cloud'
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+        - Name: '77.123street.cloud'
+          Type: AAAA
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
