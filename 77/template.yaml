@@ -32,10 +32,10 @@ Conditions:
     - !Not [Condition: UseExistingCertificateCondition]
 
 Resources:
-  CloudFrontFunction:
+  CloudFrontFunction77:
     Type: AWS::CloudFront::Function
     Properties:
-      Name: RedirectFunction
+      Name: RedirectFunction77
       AutoPublish: true
       FunctionConfig:
         Comment: 'Redirects subdomains to ${DestinationDomain}'
@@ -52,6 +52,7 @@ Resources:
           };
           return response;
         }
+
 
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
@@ -73,7 +74,7 @@ Resources:
               Forward: 'none'
           FunctionAssociations:
             - EventType: viewer-request
-              FunctionARN: !GetAtt CloudFrontFunction.FunctionARN
+              FunctionARN: !GetAtt CloudFrontFunction77.FunctionARN
         Origins:
           - Id: 'dummy'
             DomainName: 'example.com'
